@@ -1,9 +1,8 @@
-﻿using Busca_Imoveis_Caixas.Config;
-using CsvHelper.Configuration;
+﻿using CsvHelper.Configuration;
 
 namespace Buscar.Imoveis.Venda
 {
-    public sealed class ImovelMap : ClassMap<Imovel>
+    public sealed class ImovelMap : ClassMap<ImportImovel>
     {
         public ImovelMap()
         {
@@ -16,7 +15,7 @@ namespace Buscar.Imoveis.Venda
             Map(m => m.ValorAvaliacao).Name("ColumnG");
             Map(m => m.Desconto).Name("ColumnH");
             Map(m => m.Descricao).Name("ColumnI");
-            Map(m => m.ModalidadeVendaString).Name("ColumnJ");
+            Map(m => m.ModalidadeVenda).Name("ColumnJ");
             Map(m => m.Link).Name("ColumnK");
         }
     }

@@ -1,34 +1,43 @@
-﻿using Busca_Imoveis_Caixas.Config;
+﻿using Buscar.Imoveis.Venda.Messaging;
 using Buscar.Imoveis.Venda.Services.Interface;
 using CsvHelper;
 using CsvHelper.Configuration;
+using MassTransit;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
 using OpenQA.Selenium.Support.UI;
+using RabbitMQ.Client;
 using System.Formats.Asn1;
 using System.Globalization;
 using System.Text;
+using ExpectedConditions = SeleniumExtras.WaitHelpers.ExpectedConditions;
 
 namespace Buscar.Imoveis.Venda.Services
 {
     public class ImovelCaixaService : IImovelCaixaService
     {
         private readonly ChromeOptions _options;
-
-        public ImovelCaixaService()
+        private readonly IPublishEndpoint _publish;
+        public IWebDriver driver;
+        public ImovelCaixaService(IPublishEndpoint publish)
         {
             _options = new ChromeOptions();
-            _options.AddArgument("--headless");
-            _options.AddArgument("--no-sandbox");
-            _options.AddArgument("--disable-dev-shm-usage");
+            _publish = publish;
+        }
+        public async Task ProcessoImoveisCaixa()
+        {
+            var nomeArquivo = await GetListaImoveis();
+            //var nomeArquivo = @"D:\Users\erik\Documents\Caixa\Lista_imoveis_BA.csv";
+            if (!string.IsNullOrEmpty(nomeArquivo))
+            {
+                var imoveis = await ExtrairImoveisCsv(nomeArquivo);
+                driver.Quit();
+            }
         }
 
         public async Task<string> GetListaImoveis()
         {
             string pasta = @"D:\Users\erik\Documents\Caixa";
-
-            // Defina o caminho para o driver do Chrome
-            ChromeOptions options = new ChromeOptions();
 
             // Configurações de download
             var downloadPath = Path.Combine(Environment.CurrentDirectory, pasta);
@@ -43,36 +52,35 @@ namespace Buscar.Imoveis.Venda.Services
             };
             foreach (var pref in prefs)
             {
-                options.AddUserProfilePreference(pref.Key, pref.Value);
+                _options.AddUserProfilePreference(pref.Key, pref.Value);
             }
             var uf = "BA";
             // Inicia o driver com as opções configuradas
-            using (IWebDriver driver = new ChromeDriver(options))
-            {
-                driver.Navigate().GoToUrl("https://venda-imoveis.caixa.gov.br/sistema/download-lista.asp");
+            driver = new ChromeDriver(_options);
 
+            driver.Navigate().GoToUrl("https://venda-imoveis.caixa.gov.br/sistema/download-lista.asp");
 
-                IWebElement dropdownElement = driver.FindElement(By.Id("cmb_estado"));
+            IWebElement dropdownElement = driver.FindElement(By.Id("cmb_estado"));
 
-                SelectElement select = new SelectElement(dropdownElement);
+            SelectElement select = new SelectElement(dropdownElement);
 
-                select.SelectByText(uf);
+            select.SelectByText(uf);
 
-                // Lógica para clicar no link de download, etc.
-                driver.FindElement(By.XPath("//*[@id=\"btn_next1\"]")).Click();
+            // Lógica para clicar no link de download, etc.
+            driver.FindElement(By.XPath("//*[@id=\"btn_next1\"]")).Click();
 
-                Thread.Sleep(5000);
+            Thread.Sleep(5000);
 
-                string inputFilePath = @$"{pasta}\Lista_imoveis_{uf}.csv";
+            string inputFilePath = @$"{pasta}\Lista_imoveis_{uf}.csv";
 
-                return await Task.FromResult(inputFilePath);
-            }
+            return await Task.FromResult(inputFilePath);
+
         }
 
-        public async Task<List<Imovel>> ExtrairImoveisCsv(string inputFilePath)
+        public async Task<List<ImportImovel>> ExtrairImoveisCsv(string inputFilePath)
         {
-            int startLine = 5;
-            var imoveis = new List<Imovel>();
+            int startLine = 4;
+            var imoveis = new List<ImportImovel>();
 
             using (var reader = new StreamReader(inputFilePath, Encoding.GetEncoding("ISO-8859-1")))
             using (var csv = new CsvReader(reader, new CsvConfiguration(CultureInfo.InvariantCulture)
@@ -87,21 +95,124 @@ namespace Buscar.Imoveis.Venda.Services
                     reader.ReadLine(); // Ignora a linha
                 }
                 csv.Context.RegisterClassMap<ImovelMap>();
-                imoveis = csv.GetRecords<Imovel>().ToList();
 
+                imoveis = csv.GetRecords<ImportImovel>().ToList();
 
+                csv.Dispose();
+
+                if (imoveis.Count > 0)
+                {
+                    foreach (var imovel in imoveis)
+                    {
+                        ObterDescricaoImovel(imovel);
+
+                        imovel.TratarDadosImovel();
+                        //await _publish.Publish(imovel);
+                    }
+                    GerarCsv(@"D:\Users\erik\Documents\Caixa\Lista_imoveis_BA_new.csv", imoveis);
+                }
+
+                File.Delete(inputFilePath);
 
             }
             return await Task.FromResult(imoveis); ;
         }
 
-        public async Task ProcessoImoveisCaixa()
+        public static void GerarCsv(string caminhoArquivo, List<ImportImovel> imoveis)
         {
-            var nomeArquivo = await GetListaImoveis();
-            if (!string.IsNullOrEmpty(nomeArquivo))
+            var config = new CsvConfiguration(CultureInfo.InvariantCulture)
             {
-                var imoveis = await ExtrairImoveisCsv(nomeArquivo);
+                Delimiter = ";",  // Define o delimitador como ponto e vírgula
+                Encoding = Encoding.GetEncoding("ISO-8859-1"),
+            };
+
+            using (var writer = new StreamWriter(caminhoArquivo))
+            using (var csv = new CsvWriter(writer, config))
+            {
+                csv.WriteRecords(imoveis);
             }
+        }
+
+        private void ObterDescricaoImovel(ImportImovel imovel)
+        {
+            string originalWindow = driver.CurrentWindowHandle;
+
+            ((IJavaScriptExecutor)driver).ExecuteScript($"window.open('{imovel.Link}');");
+
+            List<string> windowHandles = new List<string>(driver.WindowHandles);
+
+            // Troca para a segunda aba
+            driver.SwitchTo().Window(windowHandles[1]);
+
+            WebDriverWait wait = new WebDriverWait(driver, TimeSpan.FromSeconds(10));
+            string condominio = driver.FindElement(By.CssSelector(".control-item h5")).Text;
+            string situacao = GetSituacao();
+
+            IWebElement divPaiDescricao = driver.FindElement(By.XPath("//*[@id=\"dadosImovel\"]/div/div[3]/p[3]"));
+
+            var descricoes = divPaiDescricao.Text;
+
+            var descricaoList = descricoes.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+
+            imovel.InformacoesPagamento(descricaoList);
+
+            imovel.Condominio = condominio;
+            imovel.Situacao = situacao;
+
+            driver.Close();
+
+            // Voltar para a aba original
+            driver.SwitchTo().Window(originalWindow);
+
+            Thread.Sleep(1000);
+        }
+
+        public T GetElementText<T>(By by)
+        {
+            try
+            {
+                IWebElement element = driver.FindElement(by);
+                return (T)Convert.ChangeType(element.Text, typeof(T));
+            }
+            catch (NoSuchElementException)
+            {
+                return default;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error finding element: {ex.Message}");
+                return default;
+            }
+        }
+
+        private string GetSituacao()
+        {
+            WebDriverWait wait = new WebDriverWait(driver, TimeSpan.FromSeconds(10));
+
+            // Executar JavaScript para remover comentários do DOM
+            IJavaScriptExecutor js = (IJavaScriptExecutor)driver;
+            js.ExecuteScript(@"
+                var comments = [];
+                var walker = document.createTreeWalker(document, NodeFilter.SHOW_COMMENT, null, false);
+                var node;
+                while (node = walker.nextNode()) {
+                    var commentContent = node.nodeValue.trim();
+                    if (commentContent.startsWith('span')) {
+                        var spanElement = document.createElement('span');
+                        spanElement.innerHTML = commentContent.substring(5, commentContent.length - 7); // Remove 'span' tags
+                        node.parentNode.insertBefore(spanElement, node.nextSibling);
+                    }
+                }
+            ");
+
+            // Esperar até que a div específica esteja visível
+            IWebElement div = wait.Until(ExpectedConditions.ElementIsVisible(By.CssSelector(".control-item.control-span-6_12")));
+
+            // Agora você pode interagir com os elementos que estavam comentados
+            IWebElement situacaoSpan = div.FindElement(By.XPath(".//span[contains(text(), 'Situação:')]"));
+            Console.WriteLine(situacaoSpan.Text);
+
+            return situacaoSpan.Text;
         }
     }
 }

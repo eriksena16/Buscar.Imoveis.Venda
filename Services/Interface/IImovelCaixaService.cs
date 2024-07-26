@@ -1,11 +1,9 @@
-﻿using Busca_Imoveis_Caixas.Config;
-
-namespace Buscar.Imoveis.Venda.Services.Interface
+﻿namespace Buscar.Imoveis.Venda.Services.Interface
 {
     public interface IImovelCaixaService
     {
         Task<string> GetListaImoveis();
-        Task<List<Imovel>> ExtrairImoveisCsv(string inputFilePath);
+        Task<List<ImportImovel>> ExtrairImoveisCsv(string inputFilePath);
         Task ProcessoImoveisCaixa();
     }
 }

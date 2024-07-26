@@ -1,4 +1,4 @@
-﻿namespace Busca_Imoveis_Caixas.Config
+﻿namespace Buscar.Imoveis.Venda
 {
     public enum Browser
     {
