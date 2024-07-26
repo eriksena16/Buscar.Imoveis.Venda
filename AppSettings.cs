@@ -1,4 +1,4 @@
-﻿namespace AssetTrack.Core
+﻿namespace Buscar.Imoveis.Venda
 {
     public class AppSettings
     {
