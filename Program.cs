@@ -10,11 +10,10 @@ IHost host = Host.CreateDefaultBuilder(args)
     {
         services.Configure<AppSettings>(builder.Configuration);
         services.ConfigureBroker(builder.Configuration);
-        //services.AddHostedService<Worker>();       
         services.AddScoped<IImovelCaixaService, ImovelCaixaService>();
         services.AddScoped<IMessageBusService, RabbitMqService>();
         services.AddHostedService<BuscarImoveisService>();
-        //services.ConfigureRabbitMqServices(builder.Configuration);
+
     })
     .Build();
 

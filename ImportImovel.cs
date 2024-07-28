@@ -29,11 +29,11 @@ namespace Buscar.Imoveis.Venda
         public string Link { get; set; }
         public string Foto { get; set; }
         public string ModalidadeVenda { get; set; }
-        public bool AceitaFgts { get; private set; }
         public bool AceitaConsorcio { get; private set; }
         public bool AceitaFinanciamento { get; private set; }
         public bool AceitaParcelamento { get; private set; }
         public bool AcaoJudicial { get; private set; }
+        public bool Disponivel { get; set; }
 
         private static readonly char[] separator = [' '];
 
@@ -87,42 +87,20 @@ namespace Buscar.Imoveis.Venda
             var naoAceitaFinanciamento = " Imóvel NÃO aceita financiamento habitacional.";
             var naoAceitaParcelamento = "Imóvel NÃO aceita parcelamento.";
             var naoAceitaConsorcio = "Imóvel NÃO aceita consórcio.";
-            var naoAceitaFgts = "Imóvel NÃO aceita utilização de FGTS.";
             var aceitaFinancimento = "FINANCIAMENTO (consulte condições).";
             var acaoJudicial = "Imóvel com ação judicial";
 
-
-
-            if (!descricoes.ToList().Contains(naoAceitaConsorcio))
-                AceitaConsorcio = true;
-
-            if (!descricoes.ToList().Contains(naoAceitaFinanciamento) || descricoes.ToList().Contains(aceitaFinancimento))
-                AceitaFinanciamento = true;
-
-            if (!descricoes.ToList().Contains(naoAceitaFgts) && AceitaFinanciamento)
-                AceitaFgts = true;
-
-            if (!descricoes.ToList().Contains(naoAceitaParcelamento))
-                AceitaParcelamento = true;
-
-            if (descricoes.ToList().Contains(acaoJudicial))
-                AcaoJudicial = true;
-
-            //if (!descricao.Trim().Contains(naoAceitaParcelamento, StringComparison.CurrentCultureIgnoreCase))
-            //    AceitaParcelamento = true;
-
-            //if (descricao.Trim().Contains(acaoJudicial, StringComparison.CurrentCultureIgnoreCase))
-            //    AcaoJudicial = true;
-            //foreach (string descricao in descricoes)
-            //{
-
-
-            //}
-
-
+            foreach (var descricao in descricoes)
+            {
+                if (!descricoes.Contains(naoAceitaConsorcio))
+                    AceitaConsorcio = true;
+                else if (!descricoes.Contains(naoAceitaFinanciamento) || descricoes.ToList().Contains(aceitaFinancimento))
+                    AceitaFinanciamento = true;
+               else if (!descricoes.Contains(naoAceitaParcelamento))
+                    AceitaParcelamento = true;
+               else if (descricao.Contains(acaoJudicial))
+                    AcaoJudicial = true;
+            }
         }
-
-
     }
-
 }

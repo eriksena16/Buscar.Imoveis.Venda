@@ -99,17 +99,23 @@ namespace Buscar.Imoveis.Venda.Services
                 imoveis = csv.GetRecords<ImportImovel>().ToList();
 
                 csv.Dispose();
-
+                
                 if (imoveis.Count > 0)
                 {
                     foreach (var imovel in imoveis)
                     {
-                        ObterDescricaoImovel(imovel);
+                        if (!string.IsNullOrEmpty(imovel.NumeroImovel))
+                            ObterDescricaoImovel(imovel);
 
-                        imovel.TratarDadosImovel();
+                        if (imovel.Disponivel)
+                            imovel.TratarDadosImovel();
+
                         //await _publish.Publish(imovel);
+
                     }
-                    GerarCsv(@"D:\Users\erik\Documents\Caixa\Lista_imoveis_BA_new.csv", imoveis);
+                    var imoveisDisponivel = imoveis.Where(c => c.Disponivel).ToList();
+
+                    GerarCsv(@"D:\Users\erik\Documents\Caixa\Lista_imoveis_BA_new.csv", imoveis.Where(c => c.Disponivel));
                 }
 
                 File.Delete(inputFilePath);
@@ -118,12 +124,12 @@ namespace Buscar.Imoveis.Venda.Services
             return await Task.FromResult(imoveis); ;
         }
 
-        public static void GerarCsv(string caminhoArquivo, List<ImportImovel> imoveis)
+        public static void GerarCsv(string caminhoArquivo, IEnumerable<ImportImovel> imoveis)
         {
             var config = new CsvConfiguration(CultureInfo.InvariantCulture)
             {
                 Delimiter = ";",  // Define o delimitador como ponto e vírgula
-                Encoding = Encoding.GetEncoding("ISO-8859-1"),
+                Encoding = Encoding.UTF8,
             };
 
             using (var writer = new StreamWriter(caminhoArquivo))
@@ -144,26 +150,35 @@ namespace Buscar.Imoveis.Venda.Services
             // Troca para a segunda aba
             driver.SwitchTo().Window(windowHandles[1]);
 
-            WebDriverWait wait = new WebDriverWait(driver, TimeSpan.FromSeconds(10));
-            string condominio = driver.FindElement(By.CssSelector(".control-item h5")).Text;
-            string situacao = GetSituacao();
+            //var imovelIndisponivel_1 = GetElementText<string>(By.XPath("//*[@id=\"dadosImovel\"]/div/div/h5/p"));
+            var imovelIndisponivel = GetElementText<string>(By.XPath("//*[@id=\"dadosImovel\"]/div/div/h5"));
 
-            IWebElement divPaiDescricao = driver.FindElement(By.XPath("//*[@id=\"dadosImovel\"]/div/div[3]/p[3]"));
+            bool indisponivel = !string.IsNullOrEmpty(imovelIndisponivel) && imovelIndisponivel.Contains("O imóvel que você procura não está mais disponível para venda");
+            if (!indisponivel)
+            {
+                WebDriverWait wait = new WebDriverWait(driver, TimeSpan.FromSeconds(10));
+                string condominio = driver.FindElement(By.CssSelector(".control-item h5")).Text;
+                string situacao = GetSituacao();
 
-            var descricoes = divPaiDescricao.Text;
+                IWebElement divPaiDescricao = driver.FindElement(By.XPath("//*[@id=\"dadosImovel\"]/div/div[3]/p[3]"));
 
-            var descricaoList = descricoes.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                var descricoes = divPaiDescricao.Text;
 
-            imovel.InformacoesPagamento(descricaoList);
+                var descricaoList = descricoes.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
 
-            imovel.Condominio = condominio;
-            imovel.Situacao = situacao;
+                imovel.InformacoesPagamento(descricaoList);
+
+                imovel.Condominio = condominio;
+                imovel.Situacao = situacao;
+                imovel.Disponivel = true;
+
+
+            }
 
             driver.Close();
 
             // Voltar para a aba original
             driver.SwitchTo().Window(originalWindow);
-
             Thread.Sleep(1000);
         }
 
@@ -187,11 +202,13 @@ namespace Buscar.Imoveis.Venda.Services
 
         private string GetSituacao()
         {
-            WebDriverWait wait = new WebDriverWait(driver, TimeSpan.FromSeconds(10));
+            try
+            {
+                WebDriverWait wait = new WebDriverWait(driver, TimeSpan.FromSeconds(10));
 
-            // Executar JavaScript para remover comentários do DOM
-            IJavaScriptExecutor js = (IJavaScriptExecutor)driver;
-            js.ExecuteScript(@"
+                // Executar JavaScript para remover comentários do DOM
+                IJavaScriptExecutor js = (IJavaScriptExecutor)driver;
+                js.ExecuteScript(@"
                 var comments = [];
                 var walker = document.createTreeWalker(document, NodeFilter.SHOW_COMMENT, null, false);
                 var node;
@@ -205,14 +222,21 @@ namespace Buscar.Imoveis.Venda.Services
                 }
             ");
 
-            // Esperar até que a div específica esteja visível
-            IWebElement div = wait.Until(ExpectedConditions.ElementIsVisible(By.CssSelector(".control-item.control-span-6_12")));
+                // Esperar até que a div específica esteja visível
+                IWebElement div = wait.Until(ExpectedConditions.ElementIsVisible(By.CssSelector(".control-item.control-span-6_12")));
 
-            // Agora você pode interagir com os elementos que estavam comentados
-            IWebElement situacaoSpan = div.FindElement(By.XPath(".//span[contains(text(), 'Situação:')]"));
-            Console.WriteLine(situacaoSpan.Text);
+                // Agora você pode interagir com os elementos que estavam comentados
+                IWebElement situacaoSpan = div.FindElement(By.XPath(".//span[contains(text(), 'Situação:')]"));
+                Console.WriteLine(situacaoSpan.Text);
 
-            return situacaoSpan.Text;
+                return situacaoSpan.Text;
+            }
+            catch
+            {
+
+                return string.Empty;
+            }
+
         }
     }
 }
