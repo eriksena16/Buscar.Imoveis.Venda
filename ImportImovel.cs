@@ -1,28 +1,21 @@
-﻿using System.Text.RegularExpressions;
-
-namespace Buscar.Imoveis.Venda
+﻿namespace Buscar.Imoveis.Venda
 {
 
     public class ImportImovel
     {
-        public string Condominio { get; set; }
-        public string Quantidade { get; set; }
-        public string Comarca { get; set; }
+        public string NumeroImovel { get; set; }
+        public string TipoImovel { get; set; }
         public string Situacao { get; set; }
-        public string Uf { get; set; }
+        public string Condominio { get; set; }
         public string Cidade { get; set; }
         public string Bairro { get; set; }
+        public string Uf { get; set; }
         public string Preco { get; set; }
         public string Desconto { get; set; }
-        public string NumeroImovel { get; set; }
-        public string InscricaoImobiliaria { get; set; }
-        public string Matricula { get; set; }
-        public string Localizacao { get; set; }
         public string ValorAvaliacao { get; set; }
-        public string ValorMinimo { get; set; }
+        public string Quarto { get; set; }
         public string Descricao { get; set; }
         public string Endereco { get; set; }
-        public string TipoImovel { get; set; }
         public string AreaPrivativa { get; set; }
         public string AreaTerreno { get; set; }
         public string AreaTotal { get; set; }
@@ -45,7 +38,7 @@ namespace Buscar.Imoveis.Venda
             AreaTotal = ObterValor(linhas, 1);
             AreaPrivativa = ObterValor(linhas, 2);
             AreaTerreno = ObterValor(linhas, 3);
-            Quantidade = linhas.Length > 4 ? linhas[4].Split(separator, StringSplitOptions.RemoveEmptyEntries)[0].Trim() : "N/A";
+            Quarto = linhas.Length > 4 ? linhas[4].Split(separator, StringSplitOptions.RemoveEmptyEntries)[0].Trim() : "N/A";
             Descricao = linhas.Length > 5 ? string.Join(", ", linhas, 5, linhas.Length - 5).Trim() : "N/A";
             NumeroImovel = NumeroImovel.Trim().PadLeft(13, '0');
             Foto = $"https://venda-imoveis.caixa.gov.br/fotos/F{NumeroImovel}21.jpg";
