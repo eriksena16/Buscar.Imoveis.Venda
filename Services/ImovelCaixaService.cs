@@ -126,17 +126,17 @@ namespace Buscar.Imoveis.Venda.Services
 
         public static void GerarCsv(string caminhoArquivo, IEnumerable<ImportImovel> imoveis)
         {
+            var utf8Bom = new UTF8Encoding(true); 
+
             var config = new CsvConfiguration(CultureInfo.InvariantCulture)
             {
-                Delimiter = ";",  // Define o delimitador como ponto e vírgula
-                Encoding = Encoding.UTF8,
+                Delimiter = ";",
+                Encoding = utf8Bom,
             };
 
-            using (var writer = new StreamWriter(caminhoArquivo))
-            using (var csv = new CsvWriter(writer, config))
-            {
-                csv.WriteRecords(imoveis);
-            }
+            using var writer = new StreamWriter(caminhoArquivo, false, utf8Bom);
+            using var csv = new CsvWriter(writer, config);
+            csv.WriteRecords(imoveis);
         }
 
         private void ObterDescricaoImovel(ImportImovel imovel)
